@@ -71,6 +71,7 @@ class WellBore(Base):
 
     wellboredetail = relationship('WellBoreDetail', backref='WellBore')
 
+
 class WellBoreDetail(Base):
     __tablename__ = 'WellBoreDetail'
 
@@ -158,9 +159,7 @@ def define_type(rec):
             'name'      : 'canada_ts',
             'criteria'  : rec.wb.uwi.startswith('2'),
             'model'     : Canada_ts(rec)
-         }),
-    ]
-
+         }),    ]
 
     # if criteria is fulfilled return the above Type object, including the reference to a model
     for region in regions:
@@ -174,8 +173,8 @@ if __name__ == '__main__':
     # query = query.join(Geography, County, WellBoreDetail, WellBore).filter(WellBoreDetail.locnum == '2')
     query = query.join(Geography, County, WellBoreDetail, WellBore).filter(County.state_code == 'TX')
     # query = query.join(Geography, County, WellBoreDetail, WellBore)
-    # print query
-    for i, (coo, geo, cty, wbd, wb) in enumerate(query.limit(1), start=1):    
+    print query
+    for i, (coo, geo, cty, wbd, wb) in enumerate(query.limit(10), start=1):    
     # for i, (coo, geo, cty, wbd, wb) in enumerate(query, start=1):    
         rec = Rec(coo, geo, cty, wbd, wb)
         model = define_type(rec)
@@ -186,4 +185,4 @@ if __name__ == '__main__':
             print rec.wbd.locnum, rec.coo.northing, rec.coo.easting, rec.coo.epsg_code, rec.geo.legal_desc, rec.cty.state_code
 
     # commits the changes into the database
-    session.commit()
+    # session.commit()
