@@ -87,7 +87,7 @@ def calc_point_from_offsets(four_corners_wm, ftg1, dir1, ftg2, dir2):
         
         pnt = offset_line1.intersection(offset_line2)
         if not pnt:
-            print'\tcould not resolve the intersection\n'
+            print'\tcould not resolve the intersection'
             return None
 
     return transform(3857, 4269, pnt)
@@ -108,10 +108,10 @@ def queryWKT(table, where_clause, cursor=cur_read ):
         # print row[0]
         row1 = cursor.fetchone()
         if row1: 
-            print '\tmore than one polygon returned from the statement: %s\n' % select_statement
+            print '\tmore than one polygon returned from the statement: %s' % select_statement
             return None
         return row[0]
-    print '\tno record returned based on statement: %s\n' % select_statement
+    print '\tno record returned based on statement: %s' % select_statement
     return None
 
 

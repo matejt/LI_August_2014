@@ -24,6 +24,7 @@ class County(Base):
 
     geo = relationship('Geography', backref='refCounty')
 
+
 class Geography(Base): 
     __tablename__ = 'Geography'
 
@@ -169,20 +170,25 @@ def define_type(rec):
 
 if __name__ == '__main__':
     session = rigdata21_session_maker()
-    query = session.query(Coordinates, Geography, County, WellBoreDetail, WellBore)
+    query = session.query(Geography, Coordinates, County, WellBoreDetail, WellBore)
     # query = query.join(Geography, County, WellBoreDetail, WellBore).filter(WellBoreDetail.locnum == '2')
-    query = query.join(Geography, County, WellBoreDetail, WellBore).filter(County.state_code == 'TX')
+    # query = query.join(Geography, County, WellBoreDetail, WellBore).filter(County.state_code == 'TX', WellBoreDetail.locnum == '1262686')
+    # query = query.join(Coordinates, County, WellBoreDetail, WellBore).filter(County.state_code == 'TX', WellBoreDetail.locnum == '1262693')
+    query = query.join(Coordinates, County, WellBoreDetail, WellBore).filter(County.state_code == 'TX')
     # query = query.join(Geography, County, WellBoreDetail, WellBore)
     print query
-    for i, (coo, geo, cty, wbd, wb) in enumerate(query.limit(10), start=1):    
+    for i, (geo, coo, cty, wbd, wb) in enumerate(query.limit(100), start=1):    
     # for i, (coo, geo, cty, wbd, wb) in enumerate(query, start=1):    
         rec = Rec(coo, geo, cty, wbd, wb)
-        model = define_type(rec)
-        if model:
+        model_object = define_type(rec)
+        if model_object:
             pass
-            model.coordinates()
+            model_object.coordinates()
+            model_object.location_quality()
+            if not model_object.get_point():
+                model_object.assign_centroid()
         else:
             print rec.wbd.locnum, rec.coo.northing, rec.coo.easting, rec.coo.epsg_code, rec.geo.legal_desc, rec.cty.state_code
 
     # commits the changes into the database
-    # session.commit()
+    session.commit()
