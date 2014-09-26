@@ -17,11 +17,11 @@ def meridian_zone(state_code, county_name, twnshp, twnshp_dir, range_, range_dir
         if county_name in ('PICKENS', 'GREENE', 'TUSCALOOSA', 'BIBB', 'SHELBY', 'CLAY'):
             return 16 if twnshp_dir == 'S' else 25
         elif county_name == 'HOUSTON':
-            return 29 if twnshp == 7 AND range_ > 8 else 25
+            return 29 if twnshp == 7 and range_ > 8 else 25
         elif county_name == 'GENEVA':
             return 29 if twnshp in (6,7) else 25
         elif county_name == 'COVINGTON':
-            return 29 if twnshp == 6 AND range_ < 23 else 25
+            return 29 if twnshp == 6 and range_ < 23 else 25
 
     # Arizona state
     elif state_code == 'AZ':
@@ -63,11 +63,18 @@ def meridian_zone(state_code, county_name, twnshp, twnshp_dir, range_, range_dir
         elif county_name == 'MESA':
             return 23 if twnshp_dir == 'N' and range_ > 13 else 6 if range_ > 5 else 31
 
+    # Ilinois state
+    elif state_code == 'IL':
+        if county_name in ('CAMPAIGN', 'COLES', 'DOUGLAS', 'EDWARDS', 'FORD', 'IROQUOIS', 'JASPER', 'KANKAKEE', 'RICHLAND', 'WHITE'):
+            return 3 if range_dir == 'E' else 2
+        elif county_name in ('LEE', 'OGLE', 'WINNEBAGO', 'MARSHALL', 'PUTNAM'):
+            return 3 if range_ <= 3 else 4
 
 
 
     else:
-        print 'Unhadled dual meridian zone county: %s, %s' % (state_code, county_name)
+        print 'Unhadled dual meridian zone for county: %s, %s' % (state_code, county_name)
+
 
 def extend_line (line_string, distance):
     p1,p2 = Point(line_string.coords[0]), Point(line_string.coords[-1])

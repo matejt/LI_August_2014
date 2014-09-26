@@ -1,6 +1,7 @@
 from utils import CornerDetector, queryWKT, calc_point_from_offsets, transform, meridian_zone
 from shapely.wkt import dumps, loads
 
+
 class LegalDescription(object):
 
     def __init__(self, rec):
@@ -189,12 +190,12 @@ class PLS(LegalDescription):
         self.mcode2 = self.rec.cty.mcode2
         self.mcode3 = self.rec.cty.mcode3
 
-        self.twnshp = self.rec.geo.twnshp.strip()
+        self.twnshp = self.rec.geo.twnshp.strip().zfill(3)
         self.twnshp_dir = self.rec.geo.twnshp_dir.upper().strip()
-        self.range_  = self.rec.geo.range_.strip()
+        self.range_  = self.rec.geo.range_.strip().zfill(3)
         self.range_dir = self.rec.geo.range_dir.upper().strip()
 
-        self.section = self.rec.geo.section.strip()
+        self.section = self.rec.geo.section.strip().zfill(3)
         self.qsection = self.rec.geo.qsection.strip() if self.rec.geo.qsection else None
         self.qqsection = self.rec.geo.qqsection.strip() if self.rec.geo.qqsection else None
 
@@ -204,17 +205,44 @@ class PLS(LegalDescription):
         self.offset_dir_2 = self.rec.geo.offset_dir_2.upper().strip()
 
         # define the meridian zone
-        if any(self.mcode2, self.mcode3):
+        if any([self.mcode2, self.mcode3]):
             self.mcode = meridian_zone(self.state_code, self.county, self.twnshp, self.twnshp_dir, self.range_, self.range_dir)
         else:
             self.mcode = self.mcode1
 
 
         print 'calculating coordinates for %s (%s)' % (self.state_code,self.__class__.__name__)
-        print '\tloc#: %s, api: %s, state: %s, county: %s, mcode1: %i, mcode2: %i, mcode3: %i, twnshp: %s, twnshp_dir: %s, range: %s, range_dir: %s, section: %s, qsection: %s, qqsection: %s, offset1: %s, offsetDir1: %s, offset2: %s, offsetDir2: %s' \
-        % (self.locnum, self.api, self.state_code, self.county, self.mcode1, self.mcode2, self.mcode3,
+        print '\tloc#: %s, api: %s, state: %s, county: %s, mcode: %i, twnshp: %s, twnshp_dir: %s, range: %s, range_dir: %s, section: %s, qsection: %s, qqsection: %s, offset1: %s, offsetDir1: %s, offset2: %s, offsetDir2: %s' \
+        % (self.locnum, self.api, self.state_code, self.county, self.mcode,
             self.twnshp, self.twnshp_dir, self.range_, self.range_dir, self.section, self.qsection, self.qqsection,
             self.offset_1, self.offset_dir_1, self.offset_2, self.offset_dir_2)
+
+        if not all([self.state_code, self.county, self.twnshp, self.twnshp_dir, self.range_, self.range_dir, self.section, self.offset_1, self.offset_2, self.offset_dir_1, self.offset_dir_2]):
+            # self.point is None, assigned in constructor
+            return
+
+        where_clause = "StateCode LIKE '%s' AND TWN LIKE '%s' AND TWNDIR LIKE '%s' AND RNG LIKE '%s' AND RNGDIR LIKE '%s'AND SECTION LIKE '%s'" % (self.state_code, self.twnshp, self.twnshp_dir, self.range_, self.range_dir, self.section)
+        table = 'GISCoreData.dbo.PLSS_SEC_%i' % self.mcode
+        wkt = queryWKT(table, where_clause)
+
+        if not wkt or len(self.offset_dir_1) > 3 or len(self.offset_dir_2) > 3: 
+            # self.point is None, assigned in constructor
+            return
+            
+        # print wkt
+        detector = CornerDetector(wkt)
+        if detector.get_four_corners():
+            # print detector
+            self.point = calc_point_from_offsets(detector.get_four_corners(), self.offset_1, self.offset_dir_1, self.offset_2, self.offset_dir_2)
+            if self.point:
+                print '\t%s' % self.point
+                self.rec.coo.northing = self.point.y
+                self.rec.coo.easting  = self.point.x
+                self.rec.coo.epsg_code = 4269  # NAD83
+                self.initial_quality_score = 10  # if calcualted from offsets, initial qs = 10
+
+        else:
+            print '\tunable to extract four corners from the referenced shape'
 
     def location_quality(self):
         print '\tdefining location quality...'

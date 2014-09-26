@@ -179,7 +179,7 @@ if __name__ == '__main__':
     # query = query.join(Geography, County, WellBoreDetail, WellBore).filter(WellBoreDetail.locnum == '2')
     # query = query.join(Geography, County, WellBoreDetail, WellBore).filter(County.state_code == 'TX', WellBoreDetail.locnum == '1262686')
     # query = query.join(Coordinates, County, WellBoreDetail, WellBore).filter(County.state_code == 'TX', WellBoreDetail.locnum == '1262693')
-    query = query.join(Coordinates, County, WellBoreDetail, WellBore).filter(County.state_code == 'OK')
+    query = query.join(Coordinates, County, WellBoreDetail, WellBore).filter(County.state_code == 'ND')
     # query = query.join(Geography, County, WellBoreDetail, WellBore)
     print query
     for i, (geo, coo, cty, wbd, wb) in enumerate(query.limit(10), start=1):    
@@ -196,4 +196,4 @@ if __name__ == '__main__':
             print rec.wbd.locnum, rec.coo.northing, rec.coo.easting, rec.coo.epsg_code, rec.geo.legal_desc, rec.cty.state_code
 
     # commits the changes into the database
-    session.commit()
+    # session.commit()
