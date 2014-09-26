@@ -19,8 +19,13 @@ class County(Base):
     __tablename__ = 'refCounty'
 
     id  = Column('refCountyID', Integer, primary_key=True)
+    # state_id = Column('refStateID', String)
+    # county_id = Column('refCountyID', String)
     state_code = Column('stateCode', String)
     county_name = Column('LongCountyName', String)
+    mcode1 = Column('Mcode1', Integer)
+    mcode2 = Column('Mcode2', Integer)
+    mcode3 = Column('Mcode3', Integer)
 
     geo = relationship('Geography', backref='refCounty')
 
@@ -105,7 +110,7 @@ class Rec(object):
         self.geo = geo
         self.cty = cty
         self.wbd = wbd
-        self.wb = wb
+        self.wb  = wb
 
 
 def define_type(rec):
@@ -174,10 +179,10 @@ if __name__ == '__main__':
     # query = query.join(Geography, County, WellBoreDetail, WellBore).filter(WellBoreDetail.locnum == '2')
     # query = query.join(Geography, County, WellBoreDetail, WellBore).filter(County.state_code == 'TX', WellBoreDetail.locnum == '1262686')
     # query = query.join(Coordinates, County, WellBoreDetail, WellBore).filter(County.state_code == 'TX', WellBoreDetail.locnum == '1262693')
-    query = query.join(Coordinates, County, WellBoreDetail, WellBore).filter(County.state_code == 'TX')
+    query = query.join(Coordinates, County, WellBoreDetail, WellBore).filter(County.state_code == 'OK')
     # query = query.join(Geography, County, WellBoreDetail, WellBore)
     print query
-    for i, (geo, coo, cty, wbd, wb) in enumerate(query.limit(100), start=1):    
+    for i, (geo, coo, cty, wbd, wb) in enumerate(query.limit(10), start=1):    
     # for i, (coo, geo, cty, wbd, wb) in enumerate(query, start=1):    
         rec = Rec(coo, geo, cty, wbd, wb)
         model_object = define_type(rec)
