@@ -10,6 +10,65 @@ from pyparsing import commaSeparatedList
 conn_read  = pymssql.connect(host='RDSQLDEV\\RDSQLDEV')
 cur_read = conn_read.cursor()
 
+def meridian_zone(state_code, county_name, twnshp, twnshp_dir, range_, range_dir):
+
+    # Alabama state
+    if state_code == 'AL':
+        if county_name in ('PICKENS', 'GREENE', 'TUSCALOOSA', 'BIBB', 'SHELBY', 'CLAY'):
+            return 16 if twnshp_dir == 'S' else 25
+        elif county_name == 'HOUSTON':
+            return 29 if twnshp == 7 AND range_ > 8 else 25
+        elif county_name == 'GENEVA':
+            return 29 if twnshp in (6,7) else 25
+        elif county_name == 'COVINGTON':
+            return 29 if twnshp == 6 AND range_ < 23 else 25
+
+    # Arizona state
+    elif state_code == 'AZ':
+        if county_name == 'APACHE':
+            return 22 if range_dir == 'W' else 14
+        if county_name == 'YUMA':
+            return 27 if range_dir == 'E' else 14
+
+    #Arkansas state
+    elif state_code == 'AK':
+        if county_name in ('PHILLIPS', 'DESHA'):
+            return 10 if range_dir == 'W' else 5
+
+    # California state
+    elif state_code == 'CA':
+        if county_name in ('SAN LUIS OBISPO', 'SANTA BARBARA', 'KERN', 'INYO'):
+            return 27 if twnshp_dir == 'N' else 21
+        elif county_name == 'SAN BERNARDINO':
+            return 27 if twnshp_dir == 'N' and twnshp < 4 else 21
+        elif county_name =='MENDOCHINO':
+            return 21 if twnshp_dir == 'N' else 15
+        elif county_name =='TRINITY':
+            return 21 if range_dir == 'W' else 15
+        elif county_name =='SISKIYOU':
+            return 21 if twnshp > 20 else 15
+        elif county_name =='IMPERIAL':
+            return 27 if range_dir == 'E' else 14
+
+    # Colorado state
+    elif state_code == 'CO':
+        if county_name in ('COSTILLA', 'ALAMOSA', 'CUSTER', 'FREMONT'):
+            return 23 if range_dir == 'E' else 6
+        elif county_name == 'SAGUACHE':
+            return 23 if range_dir == 'E' and range_ < 72 else 6
+        elif county_name in ('CHAFFEE', 'GUNNISON'):
+            return 23 if twnshp_dir == 'N' else 6
+        elif county_name == 'DELTA':
+            return 23 if twnshp_dir == 'N' else 6 if range_dir == 'W' else 31
+        elif county_name == 'MESA':
+            return 23 if twnshp_dir == 'N' and range_ > 13 else 6 if range_ > 5 else 31
+
+
+
+
+    else:
+        print 'Unhadled dual meridian zone county: %s, %s' % (state_code, county_name)
+
 def extend_line (line_string, distance):
     p1,p2 = Point(line_string.coords[0]), Point(line_string.coords[-1])
     p3 = Point(p1.x + (p1.x - p2.x) / line_string.length * distance, p1.y + (p1.y - p2.y) / line_string.length * distance)
