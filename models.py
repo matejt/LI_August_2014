@@ -1,4 +1,4 @@
-from utils import CornerDetector, queryWKT, calc_point_from_offsets, transform
+from utils import CornerDetector, queryWKT, calc_point_from_offsets, transform, meridian_zone
 from shapely.wkt import dumps, loads
 
 class LegalDescription(object):
@@ -6,13 +6,20 @@ class LegalDescription(object):
     def __init__(self, rec):
         self.rec = rec
         self.locnum = rec.wbd.locnum.strip()
-        self.state = self.rec.cty.state_code.strip()
+        self.state_code = self.rec.cty.state_code.upper().strip()
+        # self.county_id = self.rec.cty.county_id
+        # self.state_id = self.rec.cty.state_id
         self.county = self.rec.cty.county_name.upper().strip()
         self.api = rec.wb.api.strip()
 
         self.point = None
         self.reference_shapes = None
         self.initial_quality_score = 0
+
+    def coordinates(self):
+        # ony callsed for classes that have coordinates entered manually or imported
+        print 'LegalDescription.coordinates method called.'
+        pass
 
     def get_5d_api(self):
         _api = self.api.split('-')
@@ -83,9 +90,9 @@ class Texas(LegalDescription):
         self.offset_2 = self.rec.geo.offset_2
         self.offset_dir_2 = self.rec.geo.offset_dir_2.upper().strip()
         
-        print '\ncalculating coordinates for %s (%s):' % (self.state,self.__class__.__name__)
+        print '\ncalculating coordinates for %s (%s):' % (self.state_code,self.__class__.__name__)
         print '\tloc#: %s, api: %s, state: %s, county: %s, abstract no: %s, offset1: %s, offsetDir1: %s, offset2: %s, offsetDir2: %s' \
-                % (self.locnum, self.api, self.state, self.county, self.abstract_no, self.offset_1, self.offset_dir_1, self.offset_2, self.offset_dir_2)
+                % (self.locnum, self.api, self.state_code, self.county, self.abstract_no, self.offset_1, self.offset_dir_1, self.offset_2, self.offset_dir_2)
 
         # if data necessary for calculation is missing, return
         if not all([self.county, self.abstract_no, self.offset_1, self.offset_2, self.offset_dir_1, self.offset_dir_2]):
@@ -177,8 +184,41 @@ class WV_Pensylvania(LegalDescription):
 class PLS(LegalDescription):
 
     def coordinates(self):
-        print 'calculating coordinates for %s (%s)' % (self.rec.cty.state_code,self.__class__.__name__)
-        abstract = self.rec
+        # variables
+        self.mcode1 = self.rec.cty.mcode1
+        self.mcode2 = self.rec.cty.mcode2
+        self.mcode3 = self.rec.cty.mcode3
+
+        self.twnshp = self.rec.geo.twnshp.strip()
+        self.twnshp_dir = self.rec.geo.twnshp_dir.upper().strip()
+        self.range_  = self.rec.geo.range_.strip()
+        self.range_dir = self.rec.geo.range_dir.upper().strip()
+
+        self.section = self.rec.geo.section.strip()
+        self.qsection = self.rec.geo.qsection.strip() if self.rec.geo.qsection else None
+        self.qqsection = self.rec.geo.qqsection.strip() if self.rec.geo.qqsection else None
+
+        self.offset_1 = self.rec.geo.offset_1
+        self.offset_dir_1 = self.rec.geo.offset_dir_1.upper().strip()
+        self.offset_2 = self.rec.geo.offset_2
+        self.offset_dir_2 = self.rec.geo.offset_dir_2.upper().strip()
+
+        # define the meridian zone
+        if any(self.mcode2, self.mcode3):
+            self.mcode = meridian_zone(self.state_code, self.county, self.twnshp, self.twnshp_dir, self.range_, self.range_dir)
+        else:
+            self.mcode = self.mcode1
+
+
+        print 'calculating coordinates for %s (%s)' % (self.state_code,self.__class__.__name__)
+        print '\tloc#: %s, api: %s, state: %s, county: %s, mcode1: %i, mcode2: %i, mcode3: %i, twnshp: %s, twnshp_dir: %s, range: %s, range_dir: %s, section: %s, qsection: %s, qqsection: %s, offset1: %s, offsetDir1: %s, offset2: %s, offsetDir2: %s' \
+        % (self.locnum, self.api, self.state_code, self.county, self.mcode1, self.mcode2, self.mcode3,
+            self.twnshp, self.twnshp_dir, self.range_, self.range_dir, self.section, self.qsection, self.qqsection,
+            self.offset_1, self.offset_dir_1, self.offset_2, self.offset_dir_2)
+
+    def location_quality(self):
+        print '\tdefining location quality...'
+        pass
 
 
 class Canada_dls(LegalDescription):
