@@ -10,6 +10,19 @@ from pyparsing import commaSeparatedList
 conn_read  = pymssql.connect(host='RDSQLDEV\\RDSQLDEV')
 cur_read = conn_read.cursor()
 
+def ensure_polygon(geom_object):
+    if geom_object.geom_type == 'Polygon':
+        return geom_object
+    elif geom_object.geom_type == 'MultiPolygon':
+        _area, _poly = 0, None
+        for poly in geom_object.geoms:
+            if poly.area > _area: 
+                _poly = poly
+                _area = poly.area
+        return _poly
+    else:
+        raise Exception('ensure_polygon function: unsupported geometry type: %s' % geom_object.geom_type)
+
 def meridian_zone(state_code, county_name, twnshp, twnshp_dir, range_, range_dir):
 
     # Alabama state
@@ -136,10 +149,10 @@ def calc_point_from_offsets(four_corners_wm, ftg1, dir1, ftg2, dir2):
     if not lines: 
         print '\tcould not resolve offset lines.'
         return None
-    # offset_line1 = lines.get(dir1.upper(), None).parallel_offset(ft2m(ftg1) / wm_corr_factor, 'right')
-    # offset_line2 = lines.get(dir2.upper(), None).parallel_offset(ft2m(ftg2) / wm_corr_factor, 'right')
-    offset_line1 = lines.get(dir1, None).parallel_offset(ft2m(ftg1), 'right')  # without the correction factor
-    offset_line2 = lines.get(dir2, None).parallel_offset(ft2m(ftg2), 'right')  # without the correction factor
+    offset_line1 = lines.get(dir1.upper(), None).parallel_offset(ft2m(ftg1) / wm_corr_factor, 'right')
+    offset_line2 = lines.get(dir2.upper(), None).parallel_offset(ft2m(ftg2) / wm_corr_factor, 'right')
+    # offset_line1 = lines.get(dir1, None).parallel_offset(ft2m(ftg1), 'right')  # without the correction factor
+    # offset_line2 = lines.get(dir2, None).parallel_offset(ft2m(ftg2), 'right')  # without the correction factor
 
     # for pnt in offset_line1.coords:
     #     print pnt
@@ -164,7 +177,7 @@ def bearing_deg(pnt1, pnt2):
 
 
 def queryWKT(table, where_clause, cursor=cur_read ):
-    # select_statement = 'SELECT  [geom].STAsText() FROM [GISCoreData].[dbo].[TexasSurveys] WHERE %s' % where_clause
+
     select_statement = 'SELECT  geom.STAsText() FROM %s WHERE %s' % (table, where_clause)
     # print select_statement
     cursor.execute(select_statement)
