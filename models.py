@@ -1,17 +1,13 @@
-from utils import CornerDetector, queryWKT, calc_point_from_offsets, transform, meridian_zone
+from utils import CornerDetector, queryWKT, calc_point_from_offsets, transform, meridian_zone, ensure_polygon
 from shapely.wkt import dumps, loads
-
+from shapely.ops import cascaded_union
 
 class LegalDescription(object):
 
     def __init__(self, rec):
         self.rec = rec
         self.locnum = rec.wbd.locnum.strip()
-        self.state_code = self.rec.cty.state_code.upper().strip()
-        # self.county_id = self.rec.cty.county_id
-        # self.state_id = self.rec.cty.state_id
-        self.county = self.rec.cty.county_name.upper().strip()
-        self.api = rec.wb.api.strip()
+        self.legal_desc = self.rec.geo.legal_desc
 
         self.point = None
         self.reference_shapes = None
@@ -68,10 +64,13 @@ class LegalDescription(object):
 
         score  = self.initial_quality_score
         for name, shape in self.reference_shapes.iteritems():
+            shape = ensure_polygon(shape)
+            # print name, dumps(shape)
             if shape.intersection(transform(4269, 3857, self.point)): 
                 score += 10
                 print '\tpoint inside the shape: %s' % name
             else:
+                score -= 10
                 print '\tpoint outside the shape: %s' % name
         # reset score if the point does not fall within any of the related shapes
         if score == self.initial_quality_score:
@@ -80,7 +79,27 @@ class LegalDescription(object):
         return score
 
 
-class Texas(LegalDescription):
+class LegalDescription_USA(LegalDescription):
+    
+    def __init__(self, rec):
+        super( LegalDescription_USA, self ).__init__(rec)
+        self.state_code = self.rec.sta.state_code.upper().strip()
+        self.county = self.rec.cty.county_name.upper().strip() if self.rec.cty else None
+        self.api = rec.wb.api.strip()
+
+
+class LegalDescription_Canada(LegalDescription):
+    
+    def __init__(self, rec):
+        super( LegalDescription_Canada, self ).__init__(rec)
+        self.province_code = self.rec.sta.state_code.upper().strip()
+        self.uwi = rec.wb.uwi.strip()
+
+
+class Texas(LegalDescription_USA):
+
+    def __init__(self, rec):
+        super(Texas, self).__init__(rec)
 
     def coordinates(self):
         # variables
@@ -154,35 +173,51 @@ class Texas(LegalDescription):
         print '\tlocation quality: %s' % location_quality_score
 
 
-class Ohio_Virginia(LegalDescription):
+class Ohio_Virginia(LegalDescription_USA):
+
+    def __init__(self, rec):
+        super(Ohio_Virginia, self).__init__(rec)
+
 
     def coordinates(self):
-        print 'calculating coordinates for %s (%s)' % (self.rec.cty.state_code,self.__class__.__name__)
+        print 'calculating coordinates for %s (%s)' % (self.rec.sta.state_code,self.__class__.__name__)
         abstract = self.rec
 
 
-class Kentucky_Tennessee(LegalDescription):
+class Kentucky_Tennessee(LegalDescription_USA):
+
+    def __init__(self, rec):
+        super(Kentucky_Tennessee, self).__init__(rec)
 
     def coordinates(self):
-        print 'calculating coordinates for %s (%s)' % (self.rec.cty.state_code,self.__class__.__name__)
+        print 'calculating coordinates for %s (%s)' % (self.rec.sta.state_code,self.__class__.__name__)
         abstract = self.rec
 
 
-class NewYork(LegalDescription):
+class NewYork(LegalDescription_USA):
+
+    def __init__(self, rec):
+        super(NewYork, self).__init__(rec)
 
     def coordinates(self):
-        print 'calculating coordinates for %s (%s)' % (self.rec.cty.state_code,self.__class__.__name__)
+        print 'calculating coordinates for %s (%s)' % (self.rec.sta.state_code,self.__class__.__name__)
         abstract = self.rec
 
 
-class WV_Pensylvania(LegalDescription):
+class WV_Pensylvania(LegalDescription_USA):
+
+    def __init__(self, rec):
+        super(WV_Pensylvania, self).__init__(rec)
 
     def coordinates(self):
-        print 'calculating coordinates for %s (%s)' % (self.rec.cty.state_code,self.__class__.__name__)
+        print 'calculating coordinates for %s (%s)' % (self.rec.sta.state_code,self.__class__.__name__)
         abstract = self.rec
 
 
-class PLS(LegalDescription):
+class PLS(LegalDescription_USA):
+
+    def __init__(self, rec):
+        super(PLS, self).__init__(rec)
 
     def coordinates(self):
         # variables
@@ -210,10 +245,9 @@ class PLS(LegalDescription):
         else:
             self.mcode = self.mcode1
 
-
         print 'calculating coordinates for %s (%s)' % (self.state_code,self.__class__.__name__)
-        print '\tloc#: %s, api: %s, state: %s, county: %s, mcode: %i, twnshp: %s, twnshp_dir: %s, range: %s, range_dir: %s, section: %s, qsection: %s, qqsection: %s, offset1: %s, offsetDir1: %s, offset2: %s, offsetDir2: %s' \
-        % (self.locnum, self.api, self.state_code, self.county, self.mcode,
+        print '\tloc#: %s, api: %s, state: %s, county: %s, mcode: %i, leg_desc: %s, twnshp: %s, twnshp_dir: %s, range: %s, range_dir: %s, section: %s, qsection: %s, qqsection: %s, offset1: %s, offsetDir1: %s, offset2: %s, offsetDir2: %s' \
+        % (self.locnum, self.api, self.state_code, self.county, self.mcode, self.legal_desc,
             self.twnshp, self.twnshp_dir, self.range_, self.range_dir, self.section, self.qsection, self.qqsection,
             self.offset_1, self.offset_dir_1, self.offset_2, self.offset_dir_2)
 
@@ -245,19 +279,78 @@ class PLS(LegalDescription):
             print '\tunable to extract four corners from the referenced shape'
 
     def location_quality(self):
+
+        # dictionary that containes pairs rank: Polygon
+        _shapes = {}
+
+        # extract API region
+        where_clause = "FIPS_API = '%s'" % (self.get_5d_api())
+        table = 'GISCoreData.dbo.API_Regions_WM'
+        polygon_WKT = queryWKT(table, where_clause)
+        if polygon_WKT: 
+            poly = loads(polygon_WKT)
+            _shapes['Api_region'] = poly
+
+        #exctract section
+        where_clause = "StateCode LIKE '%s' AND TWN LIKE '%s' AND TWNDIR LIKE '%s' AND RNG LIKE '%s' AND RNGDIR LIKE '%s'AND SECTION LIKE '%s'" % (self.state_code, self.twnshp, self.twnshp_dir, self.range_, self.range_dir, self.section)
+        table = 'GISCoreData.dbo.PLSS_SEC_%i' % self.mcode
+        polygon_WKT = queryWKT(table, where_clause)
+        if polygon_WKT: 
+            poly = loads(polygon_WKT)
+            _shapes['Section'] = poly
+
+        # qqsection if exists
+        if self.qqsection:
+            where_clause = "TWN LIKE '%s' AND TWNDIR LIKE '%s' AND RNG LIKE '%s' AND RNGDIR LIKE '%s'AND SECTION LIKE '%s' AND qqsection like '%s%s'" % (self.twnshp, self.twnshp_dir, self.range_, self.range_dir, self.section, self.qsection, self.qqsection)
+            table = 'GISCoreData.dbo.PLSS_QQ_%i' % self.mcode
+            polygon_WKT = queryWKT(table, where_clause)
+            if polygon_WKT: 
+                poly = loads(polygon_WKT)
+                _shapes['qqSection'] = poly
+
+        #TODO: add more conditions
+
+        self.reference_shapes = _shapes
+        location_quality_score = self.location_quality_score()
+        self.rec.coo.loc_quality = location_quality_score
+        print '\tlocation quality: %s' % location_quality_score
+
+
+class Canada_dls(LegalDescription_Canada):
+
+    def __init__(self, rec):
+        super(Canada_dls, self).__init__(rec)
+
+    def coordinates(self):
+        print 'calculating coordinates for %s (%s)' % (self.rec.sta.state_code,self.__class__.__name__)
+        abstract = self.rec
+
+    def location_quality(self):
+
         print '\tdefining location quality...'
-        pass
 
 
-class Canada_dls(LegalDescription):
+class Canada_ts(LegalDescription_Canada):
 
-    def coordinates(self):
-        print 'calculating coordinates for %s (%s)' % (self.rec.cty.state_code,self.__class__.__name__)
-        abstract = self.rec
-
-
-class Canada_ts(LegalDescription):
+    def __init__(self, rec):
+        super(Canada_ts, self).__init__(rec)
 
     def coordinates(self):
-        print 'calculating coordinates for %s (%s)' % (self.rec.cty.state_code,self.__class__.__name__)
-        abstract = self.rec
+        # variables
+        self.map_sheet = self.rec.geo.map_sheet.strip()
+        self.unit = self.rec.geo.unit.strip()
+        self.quarter_unit = self.rec.geo.quarter_unit.strip()
+        self.block = self.rec.geo.block.strip()
+
+        self.offset_1 = self.rec.geo.offset_1
+        self.offset_dir_1 = self.rec.geo.offset_dir_1.upper().strip()
+        self.offset_2 = self.rec.geo.offset_2
+        self.offset_dir_2 = self.rec.geo.offset_dir_2.upper().strip()
+
+        print 'calculating coordinates for %s (%s)' % (self.rec.sta.state_code,self.__class__.__name__)
+        print '\tloc#: %s, uwi: %s, province: %s, mapsheet: %s, block: %s, unit: %s, qunit: %s, offset1: %s, offsetDir1: %s, offset2: %s, offsetDir2: %s' \
+                % (self.locnum, self.uwi, self.province_code, self.map_sheet, self.block, self.unit, self.quarter_unit, self.offset_1, self.offset_dir_1, self.offset_2, self.offset_dir_2)
+
+    def location_quality(self):
+
+        print '\tdefining location quality...'
