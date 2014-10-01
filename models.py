@@ -2,6 +2,7 @@ from utils import CornerDetector, queryWKT, calc_point_from_offsets, transform, 
 from shapely.wkt import dumps, loads
 from shapely.ops import cascaded_union
 
+
 class LegalDescription(object):
 
     def __init__(self, rec):
@@ -133,7 +134,7 @@ class Texas(LegalDescription_USA):
         detector = CornerDetector(wkt)
         if detector.get_four_corners():
             # print detector
-            self.point = calc_point_from_offsets(detector.get_four_corners(), self.offset_1, self.offset_dir_1, self.offset_2, self.offset_dir_2)
+            self.point = calc_point_from_offsets(detector.get_four_corners(), self.offset_1, self.offset_dir_1, self.offset_2, self.offset_dir_2, units='feet')
             if self.point:
                 print '\t%s' % self.point
                 self.rec.coo.northing = self.point.y
@@ -267,7 +268,7 @@ class PLS(LegalDescription_USA):
         detector = CornerDetector(wkt)
         if detector.get_four_corners():
             # print detector
-            self.point = calc_point_from_offsets(detector.get_four_corners(), self.offset_1, self.offset_dir_1, self.offset_2, self.offset_dir_2)
+            self.point = calc_point_from_offsets(detector.get_four_corners(), self.offset_1, self.offset_dir_1, self.offset_2, self.offset_dir_2, units='feet')
             if self.point:
                 print '\t%s' % self.point
                 self.rec.coo.northing = self.point.y
@@ -322,8 +323,53 @@ class Canada_dls(LegalDescription_Canada):
         super(Canada_dls, self).__init__(rec)
 
     def coordinates(self):
+
+        # variables
+
+        self.twnshp = self.rec.geo.twnshp.strip()
+        self.range_  = self.rec.geo.range_.strip()
+
+        self.meridian = self.rec.geo.meridian.strip()
+        self.section = self.rec.geo.section.strip()
+        self.lsd = self.rec.geo.legal_subdivision.strip() if self.rec.geo.legal_subdivision else None
+        self.qsection = self.rec.geo.qsection.strip() if self.rec.geo.qsection else None
+        self.qqsection = self.rec.geo.qqsection.strip() if self.rec.geo.qqsection else None
+
+        self.offset_1 = self.rec.geo.offset_1
+        self.offset_dir_1 = self.rec.geo.offset_dir_1.upper().strip()
+        self.offset_2 = self.rec.geo.offset_2
+        self.offset_dir_2 = self.rec.geo.offset_dir_2.upper().strip()
+
         print 'calculating coordinates for %s (%s)' % (self.rec.sta.state_code,self.__class__.__name__)
-        abstract = self.rec
+        print '\tloc#: %s, uwi: %s, province: %s, meridian: %s, twn: %s, rng: %s, section: %s, lsd: %s, offset1: %s, offsetDir1: %s, offset2: %s, offsetDir2: %s' \
+                % (self.locnum, self.uwi, self.province_code, self.meridian, self.twnshp, self.range_, self.section, self.lsd, self.offset_1, self.offset_dir_1, self.offset_2, self.offset_dir_2)
+
+        if not all([self.province_code, self.meridian, self.twnshp, self.range_, self.section, self.offset_1, self.offset_2, self.offset_dir_1, self.offset_dir_2]):
+            # self.point is None, assigned in constructor
+            return
+
+        where_clause = "MER = %i AND TWN = %i AND RNG = %i AND SEC = %i" % (int(self.meridian[-1]), int(self.twnshp), int(self.range_), int(self.section))
+        table = 'GISCoreData.dbo.DLS_SEC_%s' % self.province_code
+        wkt = queryWKT(table, where_clause)
+
+        if not wkt or len(self.offset_dir_1) > 3 or len(self.offset_dir_2) > 3: 
+            # self.point is None, assigned in constructor
+            return
+            
+        # print wkt
+        detector = CornerDetector(wkt)
+        if detector.get_four_corners():
+            # print detector
+            self.point = calc_point_from_offsets(detector.get_four_corners(), self.offset_1, self.offset_dir_1, self.offset_2, self.offset_dir_2, units='meters')
+            if self.point:
+                print '\t%s' % self.point
+                self.rec.coo.northing = self.point.y
+                self.rec.coo.easting  = self.point.x
+                self.rec.coo.epsg_code = 4269  # NAD83
+                self.initial_quality_score = 10  # if calcualted from offsets, initial qs = 10
+
+        else:
+            print '\tunable to extract four corners from the referenced shape'
 
     def location_quality(self):
 
@@ -336,6 +382,7 @@ class Canada_ts(LegalDescription_Canada):
         super(Canada_ts, self).__init__(rec)
 
     def coordinates(self):
+
         # variables
         self.map_sheet = self.rec.geo.map_sheet.strip()
         self.unit = self.rec.geo.unit.strip()
