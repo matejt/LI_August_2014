@@ -10,6 +10,8 @@ from pyparsing import commaSeparatedList
 conn_read  = pymssql.connect(host='RDSQLDEV\\RDSQLDEV')
 cur_read = conn_read.cursor()
 
+class CalcPointException(Exception): pass
+
 def ensure_polygon(geom_object):
     if geom_object.geom_type == 'Polygon':
         return geom_object
@@ -22,6 +24,7 @@ def ensure_polygon(geom_object):
         return _poly
     else:
         raise Exception('ensure_polygon function: unsupported geometry type: %s' % geom_object.geom_type)
+
 
 def meridian_zone(state_code, county_name, twnshp, twnshp_dir, range_, range_dir):
 
@@ -125,13 +128,17 @@ def rules(dir1, dir2, lines):
     return None
 
 
-def calc_point_from_offsets(four_corners_wm, ftg1, dir1, ftg2, dir2):
+def calc_point_from_offsets(four_corners_wm, dist1, dir1, dist2, dir2, units='feet'):
+
+    if not units.lower() in ('feet', 'meters'):
+        raise CalcPointException('Unknown units: %s' % units)
+
     dir1, dir2 = dir1.upper(), dir2.upper()
     centroid_wm = Point(avg(pnt.x for pnt in four_corners_wm.values()), avg(pnt.y for pnt in four_corners_wm.values()))
     # centroid_wm = four_corners_wm.centroid
     centroid_nad83 = transform(3857, 4269, centroid_wm)
 
-    ftg1, ftg2 = float(ftg1), float(ftg2)
+    dist1, dist2 = float(dist1), float(dist2)
 
     wm_corr_factor = math.cos(centroid_nad83.y * math.pi / 180.0) # web mercator distance correction factor
     # print 'wm_corr_factor: ', wm_corr_factor
@@ -149,10 +156,17 @@ def calc_point_from_offsets(four_corners_wm, ftg1, dir1, ftg2, dir2):
     if not lines: 
         print '\tcould not resolve offset lines.'
         return None
-    offset_line1 = lines.get(dir1.upper(), None).parallel_offset(ft2m(ftg1) / wm_corr_factor, 'right')
-    offset_line2 = lines.get(dir2.upper(), None).parallel_offset(ft2m(ftg2) / wm_corr_factor, 'right')
-    # offset_line1 = lines.get(dir1, None).parallel_offset(ft2m(ftg1), 'right')  # without the correction factor
-    # offset_line2 = lines.get(dir2, None).parallel_offset(ft2m(ftg2), 'right')  # without the correction factor
+
+    if units == 'feet':
+        offset_line1 = lines.get(dir1.upper(), None).parallel_offset(ft2m(dist1) / wm_corr_factor, 'right')
+        offset_line2 = lines.get(dir2.upper(), None).parallel_offset(ft2m(dist2) / wm_corr_factor, 'right')
+        # offset_line1 = lines.get(dir1, None).parallel_offset(ft2m(dist1), 'right')  # without the correction factor
+        # offset_line2 = lines.get(dir2, None).parallel_offset(ft2m(dist2), 'right')  # without the correction factor
+    elif units == 'meters':
+        offset_line1 = lines.get(dir1.upper(), None).parallel_offset(dist1 / wm_corr_factor, 'right')
+        offset_line2 = lines.get(dir2.upper(), None).parallel_offset(dist2 / wm_corr_factor, 'right')
+        # offset_line1 = lines.get(dir1, None).parallel_offset(ft2m(dist1), 'right')  # without the correction factor
+        # offset_line2 = lines.get(dir2, None).parallel_offset(ft2m(dist2), 'right')  # without the correction factor
 
     # for pnt in offset_line1.coords:
     #     print pnt
