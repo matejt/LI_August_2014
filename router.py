@@ -66,6 +66,10 @@ class Geography(Base):
     quarter_unit = Column('QuarterUnit', String)
     block = Column('BlockNumber', String)
 
+    # Canada dominion land survey
+    meridian = Column('Meridian', String)
+    legal_subdivision = Column('LegalSubdivision', String)
+
     offset_1 = Column('Ftg', Numeric)
     offset_dir_1 = Column('FtgDirection', String)
     offset_2 = Column('Ftg2', Numeric)
@@ -194,13 +198,15 @@ def define_type(rec):
             return region.get_model()
 
 
+
 if __name__ == '__main__':
     session = rigdata21_session_maker()
     query = session.query(Geography, Coordinates, WellBoreDetail, WellBore, State, County)
     # query = query.join(Geography, County, WellBoreDetail, WellBore).filter(WellBoreDetail.locnum == '2')
     # query = query.join(Geography, County, WellBoreDetail, WellBore).filter(County.state_code == 'TX', WellBoreDetail.locnum == '1262686')
     # query = query.join(Coordinates, County, WellBoreDetail, WellBore).filter(County.state_code == 'ND', WellBoreDetail.locnum == '771330')
-    query = query.join(Coordinates, WellBoreDetail, WellBore, State).filter(State.state_code == 'BC')
+    # query = query.join(Coordinates, WellBoreDetail, WellBore, State).filter(State.state_code == 'AB', WellBoreDetail.locnum == '939708')
+    query = query.join(Coordinates, WellBoreDetail, WellBore, State).filter(State.state_code == 'AB', WellBoreDetail.locnum == '888480')
     query = query.outerjoin(County)
     # query = query.join(Geography, County, WellBoreDetail, WellBore)
     # print query
